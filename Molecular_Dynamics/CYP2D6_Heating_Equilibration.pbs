@@ -1,0 +1,149 @@
+#!/bin/bash
+
+#PBS -S /bin/bash
+#PBS -P CBBI0930
+#PBS -q gpu_1
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -N Equilibration_CYP2D6
+#PBS -o /home/bsitabule/lustre/MD_simulations/Heating_Equilibration.out
+#PBS -e /home/bsitabule/lustre/MD_simulations/Heating_Equilibration.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+
+module purge
+module add chpc/amber/18/cuda10.1/openmpi-3.1.0/gcc-6.1.0
+source $AMBERHOME/amber.sh
+
+pushd /mnt/lustre/users/bsitabule/
+exe=$AMBERHOME/bin/pmemd.cuda
+
+DATAHOME=`pwd`
+TOPOLOGY=CYP2D6_solvated.prmtop
+STARTINGCONF=CYP2D6_solvated.rst7
+base=$(basename $STARTINGCONF .rst7)
+
+nproduction=35000000
+
+########################
+# Energy minimization 1
+########################
+#mkdir CYP2D6_min1_step1
+cd CYP2D6_min1_step1
+
+cat << eof > CYP2D6_energy_min1.in
+minimization parameters
+&cntrl
+        imin = 1, 
+        maxcyc = 10000, 
+        ncyc = 500, 
+        cut = 12,
+        ntb = 1,
+        ntr = 1, ! turn on the cartezian restraints
+        igb = 0, 
+        drms = 0.01, 
+        restraint_wt=500.0, !force constant for restraint 
+        restraintmask=':1-466 & !@H=' ! atoms in residues 1-466 restrained
+/   
+        
+eof
+
+$exe -O -i CYP2D6_energy_min1.in -o CYP2D6_energy_min1.out -p $DATAHOME/$TOPOLOGY -c $DATAHOME/$STARTINGCONF -r $base-min1.nc  -ref ../$STARTINGCONF
+
+cd ..
+
+###################################
+# minimization of the whole system#
+###################################
+#mkdir CYP2D6_min2_step2
+cd CYP2D6_min2_step2
+cat << eof > CYP2D6_energy_min2.in
+minimization parameters
+&cntrl 
+        
+        imin = 1, maxcyc = 7000, ncyc = 1000, cut = 12, ntb = 1, ntr = 0, igb = 0, drms = 0.01
+/
+
+eof
+$exe -O -i CYP2D6_energy_min2.in -o CYP2D6_energy_min2.out -p $DATAHOME/$TOPOLOGY -c ../CYP2D6_min1_step1/$base-min1.nc -r $base-min2.nc 
+cd ..
+
+
+###########################
+# Molecular dynamics stage
+##########################
+# 544564 875451 64613253
+for random in 96465
+do 
+
+#mkdir Heating
+
+cd Heating 
+
+dt=0.002 # 2fs time
+##############################################
+# 1st stage heating: restraining solute 
+##############################################
+#mkdir Heating_CYP2D6
+cd Heating_CYP2D6 
+cat << eof > CYP2D6_heating.in
+equilibration_second_stage
+&cntrl
+  imin   = 0,
+  irest  = 0, !run a new simulation
+  ntx    = 1,
+  ntb    = 1,
+  cut    = 12.0,
+  ntr    = 1,
+  ntc    = 2,    ! 2 to use SHAKE
+  tempi  = 50.0,
+  temp0  = 300.0,
+  ig     = $random , ! set this to -1 for random velocity 
+  ntt    = 3, ! Langevin dynamics
+  gamma_ln = 5.0, 
+  nstlim = 10000, 
+  dt = $dt, 
+  ntpr = 100, ! print frequency
+  ntwx = 0, ! every ntwx write to traj file 
+  ntwr = 50000, ! frequency for writing restart file 
+  restraint_wt= 10 ,  ! force constant for restraint 
+  restraintmask=':1-466 & !@H=', ! restrain residues 1 to 466 including the ligand 
+ /
+eof
+
+$exe -O -i CYP2D6_heating.in -o CYP2D6_heating.out -p $DATAHOME/$TOPOLOGY -c ../../CYP2D6_min2_step2/$base-min2.nc -r $base-heating_restart.nc -x $base-heating.nc -ref ../../CYP2D6_min2_step2/$base-min2.nc
+
+#mkdir CYP2D6_restraint_Equilibration
+#cd CYP2D6_restraint_Equilibration
+
+#restart=../Heating_CYP2D6/$base-heating_restart.nc
+
+#for restraint in 10 9 8 7 6 5 4 3 2 1 0
+#do
+#cat << eof > rmd${restraint}.in
+#equilibration_second_stage
+#&cntrl
+#  imin = 0, irest = 1, ntx = 5,
+#  ntb = 2, pres0 = 1.0, ntp = 1, ntt = 3, ! ntb 2 for constant pressure, 1 contsant volume 
+#  gamma_ln = 5.0, taup=2.0, 
+#  cut = 12.0, ntr = 0,
+#  ntc = 2, ! ntc should change to 2 to activate SHAKE
+#  tempi = 300.0, temp0 = 300.0,
+#  ioutfm = 1,
+#  nstlim = 40000, dt = $dt,
+#  ntpr = 100, ntwx = 0, ntwr = 10000, 
+#  restraint_wt= $restraint, 
+#  restraintmask=':1-466 & !@H=',
+# /
+#eof
+
+#$exe -O -i rmd$restraint.in -o rmd${restraint}.out -p $DATAHOME/$TOPOLOGY -c $restart -r $base-rmd.restart${restraint}.nc -x $base-rmd${restraint}.nc -ref ../min2_step2/$base-min2.nc
+#restart=$base-rmd.restart${restraint}.nc
+#done
+
+#cd ..
+done
+
+
+
+popd

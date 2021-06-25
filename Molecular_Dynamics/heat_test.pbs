@@ -1,0 +1,70 @@
+#!/bin/bash
+
+#PBS -S /bin/bash
+#PBS -P CBBI0930
+#PBS -q gpu_1
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -N Heating_test_CYP2D6
+#PBS -o /home/bsitabule/lustre/MD_simulations/Heating_test.out
+#PBS -e /mnt/lustre/users/bsitabule/test/Heating_test.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+
+module purge
+module add chpc/amber/18/cuda10.1/openmpi-3.1.0/gcc-6.1.0
+source $AMBERHOME/amber.sh
+
+pushd /mnt/lustre/users/bsitabule/test/
+exe=$AMBERHOME/bin/pmemd.cuda
+
+###########################
+# Molecular dynamics stage
+##########################
+# 544564 875451 64613253
+for random in 96465
+do
+
+#mkdir Heating
+
+#cd Heating
+
+dt=0.002 # 2fs time
+##############################################
+# 1st stage heating: restraining solute
+##############################################
+#mkdir Heating_CYP2D6
+#cd Heating_CYP2D6
+cat << eof > CYP2D6_test_heating.in
+equilibration_second_stage
+&cntrl
+  imin   = 0,
+  irest  = 0, !run a new simulation
+  ntx    = 1,
+  ntb    = 1,
+  cut    = 12.0,
+  ntr    = 1,
+  ntc    = 2,    ! 2 to use SHAKE
+  tempi  = 50.0,
+  temp0  = 300.0,
+  ig     = -1 , ! set this to -1 for random velocity
+  ntt    = 3, ! Langevin dynamics
+  gamma_ln = 5.0,
+  nstlim = 10000,
+  dt = 0.002,
+  ntpr = 100, ! print frequency
+  ntwx = 0, ! every ntwx write to traj file
+  ntwr = 50000, ! frequency for writing restart file
+  restraint_wt= 10 ,  ! force constant for restraint
+  restraintmask=':1-466 & !@H=', ! restrain residues 1 to 466 including the ligand
+ /
+eof
+
+$exe -O -i CYP2D6_test_heating.in -o CYP2D6_test_heating.out -p /home/bsitabule/lustre/CYP2D6_solvated.prmtop -c /mnt/lustre/users/bsitabule/CYP2D6_min2_step2/CYP2D6_solvated-min2.nc -r CYP2D6_test_heating.nc -x CYP2D6_test_heating.nc -ref /mnt/lustre/users/bsitabule/CYP2D6_min2_step2/CYP2D6_solvated-min2.nc
+
+done
+cd ..
+
+
+
+popd

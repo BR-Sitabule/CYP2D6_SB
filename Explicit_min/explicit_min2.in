@@ -1,0 +1,12 @@
+
+Test
+&cntrl
+imin = 1,
+maxcyc = 2500,
+ncyc = 1000,
+ntb = 1,
+cut = 10.0,
+ntpr = 10,
+ntr = 0
+/
+

@@ -1,0 +1,36 @@
+#PBS -S /bin/bash
+#PBS -P CBBI0930
+#PBS -q gpu_1
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -l walltime=04:00:00
+#PBS -N Equilibration_CYP2D6
+#PBS -o /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_L91M/CYP2D6_L91M_min.out
+#PBS -e /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_L91M/CYP2D6_L91M_min.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+
+module purge
+module add chpc/amber/18/cuda10.1/openmpi-3.1.0/gcc-6.1.0
+
+cd /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_L91M/
+exe=$AMBERHOME/bin/pmemd.cuda
+
+cat << eof > relax.in
+minimistation parameters
+&cntrl
+imin = 1,
+maxcyc = 500,
+ncyc = 250,
+ntb = 0,
+igb = 1,
+cut = 12,
+ntpr = 10,
+ntr= 1,
+restraint_wt=2.0,
+restraintmask=':1-469'
+ /
+eof
+
+$exe -O -i relax.in -o relax.out -p CYP2D6_L91M.prmtop -c CYP2D6_L91M.rst7 -r CYP2D6_L91M_min.nc -ref CYP2D6_L91M.rst7
+#in vacuo minimisation
+

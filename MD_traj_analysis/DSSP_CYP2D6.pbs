@@ -1,0 +1,26 @@
+#PBS -S /bin/bash
+#PBS -P CBBI0930
+#PBS -q serial
+#PBS -l select=1:ncpus=1:mem=16gb
+#PBS -l walltime=00:60:00
+#PBS -N DSSP_VAR_CYP2D6
+#PBS -o /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_VAR/Production_VAR_md/DSSP_CYP2D6_VAR.out
+#PBS -e /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_VAR/Production_VAR_md/DSSP_CYP2D6_VAR.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+
+module purge
+module add chpc/amber/18/cuda10.1/openmpi-3.1.0/gcc-6.1.0
+source $AMBERHOME/amber.sh
+
+pushd /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_VAR/Production_VAR_md
+
+#Generating Secondary Structure Analysis plots
+echo "
+parm stripped.CYP2D6_VAR_solvated.prmtop
+trajin CYP2D6_VAR_500ns.nc
+secstruct :1-466 out CYP2D6_VAR_dssp.gnu sumout CYP2D6_VAR_dssp.agr" >CYP2D6_dssp_VAR.in
+
+cpptraj -i CYP2D6_dssp_VAR.in
+
+popd

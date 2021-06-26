@@ -1,0 +1,97 @@
+#!/bin/bash
+#PBS -P CBBI0930
+#PBS -N modes_wt
+#PBS -l select=1:ncpus=1:mem=124gb
+#PBS -l walltime=12:00:00
+#PBS -q serial
+#PBS -m be
+#PBS -M rotondwasitabule@gmail.com
+#PBS -r n
+#PBS -o /home/bsitabule/lustre/MD_simulations/MD_analysis/modes/wt/modes_pbs_wt.out
+#PBS -e /home/bsitabule/lustre/MD_simulations/MD_analysis/modes/wt/modes_pbs_wt.err
+#PBS
+
+module purge
+module load chpc/amber/18/openmpi-1.8.8/gcc-4.9.0 
+
+TRAJHOME=/home/bsitabule/lustre/MD_simulations/CYP2D6_wt
+TOPOLOGY=/home/bsitabule/lustre/MD_simulations/CYP2D6_wt/stripped.CYP2D6_wt_solvated.prmtop
+
+cd /home/bsitabule/lustre/MD_simulations/MD_analysis/modes
+
+mkdir wt
+
+cd wt
+
+# select start frame of 15000 in traj
+start=15000
+
+echo "
+
+#################################################
+# Read the trajectory and topology files 
+# Only read snapshots at the equilibration phase
+#################################################
+#
+parm $TOPOLOGY
+trajin $TRAJHOME/CYP2D6_wt_500ns.nc $start 10000000000000000 5
+
+########################################
+## Fit the frames to the first snapshot
+########################################
+reference /mnt/lustre/users/bsitabule/MD_simulations/MD_analysis/CYP2D6_ref/new_CYP2D6.pdb
+rms reference @CA,C,N
+
+##############################
+# Create an average structure
+# and save it as a single frame 
+##############################
+average crdset CYP2D6_wt_average
+
+createcrd traj_CYP2D6_wt
+
+run
+
+crdaction traj_CYP2D6_wt rms ref CYP2D6_wt_average @CA,C,N
+
+# covariance of backbone atoms to allow for normal mode later
+crdaction traj_CYP2D6_wt matrix covar \
+  name CYP2D6_wt-covar @CA,C,N
+
+
+runanalysis diagmatrix CYP2D6_wt-covar out CYP2D6_wt-evecs.dat \
+  vecs 3 name myEvecs \
+  nmwiz nmwizvecs 4 nmwizfile dna.nmd nmwizmask @CA,C,N
+
+#check the first and third eigenvector - figure the non rotational eigenvectors
+crdaction traj_CYP2D6_wt projection CPU modes myEvecs \
+  beg 1 end 3 @CA,C,N
+
+
+
+run
+
+clear all
+
+
+readdata CYP2D6_wt-evecs.dat name Evecs
+
+parm $TOPOLOGY
+parmstrip !(@CA,C,N)
+parmwrite out CYP2D6_wt_modes.prmtop
+
+# -100 is an index - ocillation conformations
+runanalysis modes name Evecs trajout CYP2D6_wt_mode1.nc \
+  pcmin -100 pcmax 100 tmode 1 trajoutmask @CA,C,N  trajoutfmt netcdf 
+
+runanalysis modes name Evecs trajout CYP2D6_wt_mode2.nc \
+  pcmin -100 pcmax 100 tmode 2 trajoutmask @CA,C,N  trajoutfmt netcdf 
+
+runanalysis modes name Evecs trajout CYP2D6_wt_mode3.nc \
+  pcmin -100 pcmax 100 tmode 3 trajoutmask @CA,C,N  trajoutfmt netcdf 
+
+" > CYP2D6_wt_modes.cpptraj 
+
+cpptraj -i CYP2D6_wt_modes.cpptraj 
+cd ..
+

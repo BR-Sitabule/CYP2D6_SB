@@ -1,2 +1,2 @@
 # Molecular Dynamics
-This folder contains the 
+This folder contains the generated wildtype topology files, pdb and scripts for the molecular dynamics heating and equilibration stages (the same procedure was used for the variant enzymes). For the production stage scripts, a base is included to generate the different stages of the production and the different variants. A script for queing the different stages of the production stage is also included.  

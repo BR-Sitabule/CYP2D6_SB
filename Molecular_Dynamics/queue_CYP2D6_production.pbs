@@ -1,0 +1,30 @@
+#!/bin/bash
+#PBS -P CBBI0930
+#PBS -q normal
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -l walltime=00:01:00
+#PBS -N Queue_VAR_production_md
+#PBS -o /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_VAR/queue_VAR.out
+#PBS -e /home/bsitabule/lustre/MD_simulations/CYP2D6_missense_variants/CYP2D6_VAR/queue_VAR.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+#PBS
+
+
+# Submit the first job and save the JobID as JOBONE
+JOBONE=$(qsub md_VAR_70ns.pbs)
+# Submit the second job, use JOBONE as depend, save JobID
+JOBTWO=$(qsub -W depend=afterok:$JOBONE md_VAR_140ns.pbs)
+# Submit the third job, use JOBTWO as depend, save JobID
+JOBTHREE=$(qsub -W depend=afterok:$JOBTWO md_VAR_210ns.pbs)
+# Submit the fourth job, use JOBTHREE as depend, save JobID
+JOBFOUR=$(qsub -W depend=afterok:$JOBTHREE md_VAR_280ns.pbs)
+# Submit the fifth job, use JOBFOUR as depend, save JobID
+JOBFIVE=$(qsub -W depend=afterok:$JOBFOUR md_VAR_350ns.pbs)
+# Submit the sixth job, use JOBFIVE as depend, save JobID
+JOBSIX=$(qsub -W depend=afterok:$JOBFIVE md_VAR_420ns.pbs)
+# Submit the seventh job, use JOBSIX as depend, save JobID
+JOBSEVEN=$(qsub -W depend=afterok:$JOBSIX md_VAR_490ns.pbs)
+# Submit the eighth job, use JOBSEVEN as depend, save JobID
+JOBEIGHT=$(qsub -W depend=afterok:$JOBSEVEN md_VAR_500ns.pbs)
+

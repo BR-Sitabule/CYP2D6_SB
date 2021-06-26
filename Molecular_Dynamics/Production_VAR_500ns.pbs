@@ -1,0 +1,62 @@
+#PBS -S /bin/bash
+#PBS -P CBBI0930
+#PBS -q gpu_1
+#PBS -l select=1:ncpus=2:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -N Production_VAR_SiTns_CYP2D6
+#PBS -o /home/bsitabule/lustre/Production_VAR_SiTns.out
+#PBS -e /home/bsitabule/lustre/Production_VAR_SiTns.err
+#PBS -m abe
+#PBS -M rotondwasitabule@gmail.com
+
+module purge
+module add chpc/amber/18/cuda10.1/openmpi-3.1.0/gcc-6.1.0
+source $AMBERHOME/amber.sh
+
+pushd /home/bsitabule/lustre/
+exe=$AMBERHOME/bin/pmemd.cuda
+
+DATAHOME=`pwd`
+TOPOLOGY=CYP2D6_VAR_solvated.prmtop
+
+######################
+# Production stage
+#####################
+mkdir Production_VAR_md
+cd Production_VAR_md
+cat << eof > Production_VAR_SiTns.in
+equilibration_second_stage
+&cntrl
+  imin = 0, irest = 1, ntx = 5,
+  ntb = 1, ntp = 0, ntt = 1, pres0 = 1.0,
+  taup = 2,
+  cut = 12.0, ntr = 0,
+  ntc = 2,
+  tempi = 300.0, temp0 = 300.0,
+  ioutfm = 1,
+  nstlim = 35000000, dt = 0.002,
+  ntpr = 10000, ntwx = 5000, ntwr = 100000  ! write to traj each 10 ps
+ /
+eof
+
+$exe -O -i Production_VAR_SiTns.in -o production_VAR_SiTns${random}.out -p /$DATAHOME/$TOPOLOGY -c production_VAR_490ns${random}.rst -r production_VAR_SiTns${random}.rst -x production_VAR_SiTns${random}.nc
+
+cat << eof > reduce.in
+trajin production_VAR_SiTns${random}.nc
+image origin center 
+autoimage
+strip :WAT outprefix stripped
+fixatomorder outprefix reordered
+trajout production_VAR_SiTns_stripped${random}.nc netcdf nobox
+eof
+
+cpptraj -p $DATAHOME/$TOPOLOGY -i  reduce.in
+
+
+cd .. 
+# ~~~~~~~~~~~~~~~~~~~~~~~end of the production stage
+ 
+
+
+popd
+

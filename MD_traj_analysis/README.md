@@ -1,1 +1,1 @@
-# MD_traj_analysis
+# MD trajectory analysis

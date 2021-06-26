@@ -3,25 +3,48 @@
 echo "
 s/CYS   412/CYP   412/
 " >CYP.sed 
-
 #assigning protonation states of side chains for HIS, LYS, ASP, GLU based on their pka acquired from Propka
 sed -i -f script.sed P10635.B99990010.pdb
 #renaming BLK (heme and thioridazine) residues as "HEM" and "RTZ" respectively
 sed -i -f HEM_RTZ.sed P10635.B99990010.pdb
-#labelling proximal cysteine as CYP
-sed -i -f CYP.sed P10635.B99990010.pdb
-#grep RTZ from model, grep one drug molecule (residue 467) and redirect it to RTZ_file.pdb
-grep " RTZ " P10635.B99990010.pdb | grep " 467" > RTZ_file.pdb
+#grep RTZ from model, grep one drug molecule (residue 467) and redirect it to RTZ1_file.pdb
+grep "RTZ   467" P10635.B99990010.pdb > RTZ1_file.pdb
+#grep RTZ from model, grep one drug molecule (residue 468) and redirect it to RTZ2_file.pdb
+grep "RTZ   468" P10635.B99990010.pdb > RTZ2_file.pdb
+#add hydrogen atoms
+reduce RTZ1_file.pdb > reduced_RTZ1.pdb
+#add hydrogen atoms
+reduce RTZ2_file.pdb > reduced_RTZ2.pdb
 #convert ligand file to amber compatible pdb
-antechamber -i RTZ_file.pdb -fi pdb  -o RTZ.pdb -fo pdb -rn RTZ
+antechamber -i reduced_RTZ1.pdb -fi pdb  -o RTZ1.pdb -fo pdb -rn RTZ
+#convert ligand file to amber compatible pdb
+antechamber -i reduced_RTZ2.pdb -fi pdb  -o RTZ2.pdb -fo pdb -rn RTZ
 #using the bcc method to calculate the atomic point charge and generate mol2 for drug (RTZ)
-antechamber -i RTZ.pdb -fi pdb -o RTZ.mol2 -fo mol2 -c bcc -s 2
+antechamber -i RTZ1.pdb -fi pdb -o RTZ.mol2 -fo mol2 -c bcc -s 2
 #check if there are any missing parameters and generate frcmod file for drug (RTZ)
-parmchk2 -i RTZ.mol2 -f mol2 -o RTZ.frcmod
-#final cleaning of CYP2D6 with Heme group prior running leap
-pdb4amber -i P10635.B99990010.pdb -o Clean_P10635.B99990010.pdb --dry
+parmchk2 -i RTZ1.mol2 -f mol2 -o RTZ.frcmod
+#Remove ligands, TER and END
+grep -v "HETATM\|END\|TER" P10635.B99990010.pdb > CYP2D6_no_ligands.pdb
+#add TER after last atom
+grep -m 1 "TER" P10635.B99990010.pdb >> CYP2D6_no_ligands.pdb
+#add TER after last RTZ atom
+grep -m 1 "TER" P10635.B99990010.pdb >> RTZ2.pdb
+#add TER after last RTZ atom
+grep -m 1 "TER" P10635.B99990010.pdb >> RTZ1.pdb
+#add RTZ molecule 1 to CYP2D6_no_ligands.pdb
+cat RTZ1.pdb >> CYP2D6_no_ligands.pdb
+#add RTZ molecule 2 to CYP2D6_no_ligands.pdb
+cat RTZ2.pdb >> CYP2D6_no_ligands.pdb 
+#add HEM to CYP2D6_no_ligands.pdb
+grep " HEM   469" P10635.B99990010.pdb >> CYP2D6_no_ligands.pdb
+#add TER after last HEM atom
+grep -m 1 "TER" P10635.B99990010.pdb >> CYP2D6_no_ligands.pdb
+#add END at the end of pdb
+grep "END" P10635.B99990010.pdb >> CYP2D6_no_ligands.pdb
+#final cleaning of CYP2D6 with Heme group prior running leap 
+pdb4amber -i CYP2D6_no_ligands.pdb -o CYP2D6.pdb --dry
 #running leap
-tleap -f tleap_ligands.in
+tleap -f topology_CYP2D6.in
 
 #in vacuo minimisation
 echo "

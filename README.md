@@ -1,2 +1,2 @@
 # CYP2D6_SB
-CYP2D6 Structural Bioinformatics Analysis
+This project entails the evaluation of the potential impact of CYP2D6 missense variants found in sub-Saharan African populations using structural bioinformatics approaches.
